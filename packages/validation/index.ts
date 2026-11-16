@@ -1,0 +1,12 @@
+import { z } from 'zod';
+export const roles = ['management','principal','hod','teacher','accounts','admin','parent','student','vicePrincipal','incharge','examCoordinator','admissionsOfficer','hr','librarian','transportManager','driver','busAttendant','hostelWarden','inventoryManager','nurse','counsellor','security','auditor','groupAdmin','applicantParent','alumni','platformSuperAdmin','adReviewer','supportAgent'] as const;
+export type Role = typeof roles[number];
+export const uuid = z.string().uuid();
+export const pagination = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), limit: z.coerce.number().int().min(1).max(100).default(20) });
+export const loginInput = z.object({ email: z.email().max(254).transform(v => v.toLowerCase()), password: z.string().min(1).max(128), code: z.string().regex(/^\d{6}$/).optional(),loginChallengeId:z.uuid().optional() }).strict();
+export const switchInput = z.object({ membershipId: uuid }).strict();
+export const aiInput = z.object({ task: z.enum(['worksheet', 'circular', 'translation']), prompt: z.string().min(5).max(4000), dataTier: z.enum(['public', 'personal']) }).strict();
+export const aiSettingsInput = z.object({ enabled: z.boolean(), monthlyCapPaise: z.string().regex(/^\d{1,8}$/), version: z.number().int().positive() }).strict();
+export const themeInput = z.object({ accent: z.string().regex(/^#[0-9a-fA-F]{6}$/), version: z.number().int().positive() }).strict();
+export const languages = ['en', 'te', 'hi'] as const;
+export type Language = typeof languages[number];

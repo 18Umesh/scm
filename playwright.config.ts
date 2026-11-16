@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({testDir:'./tests/browser',testMatch:'netaji.spec.ts',timeout:45000,expect:{timeout:15000},fullyParallel:false,workers:1,reporter:'list',use:{baseURL:'http://netaji.localhost:3000',headless:true,screenshot:'only-on-failure',trace:'retain-on-failure'},webServer:{command:'npx --yes pnpm@10.32.1 dev',url:'http://localhost:3000/api/health',reuseExistingServer:!process.env.CI,timeout:120000},projects:[{name:'chromium',use:{browserName:'chromium'}}]});

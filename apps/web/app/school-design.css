@@ -1,0 +1,38 @@
+html[data-school-design]:not([data-theme=dark]){--brand:var(--school-primary);--brand-soft:var(--school-soft);--mist:var(--school-bg);--surface:#fff;--slate:#526172;--ink:#192334;--line:#dde3e8;--muted-surface:var(--school-bg)}
+html[data-school-design] :is(.family-app,.teacher-app,.accounts-app,.driver-app,.workspace-layout,.campus-app){font-family:var(--school-font);--teacher-accent:var(--school-primary);--teacher-soft:var(--school-soft);--accounts-accent:var(--school-primary);--accent:var(--school-primary);--family-link:var(--school-primary)}
+html[data-school-design]:not([data-theme=dark]) :is(.family-app,.teacher-app,.accounts-app,.driver-app){background:var(--school-bg);--teacher-bg:var(--school-bg);--teacher-surface:#fff;--teacher-soft:var(--school-soft);--family-soft:var(--school-soft);--family-card:#fff;--family-ink:#192334;--family-muted:#526172}
+html[data-school-design] :is(.family-content,.teacher-main,.accounts-main,.driver-main){gap:var(--school-gap)}
+html[data-school-design] :is(.family-card,.school-feed-card,.teacher-panel,.teacher-class-card,.accounts-card,.accounts-invoice,.parent-bus-card,.driver-trip,.report-subject,.report-history,.report-comparison,.report-document,.parent-service,.family-record-card){border-radius:var(--school-radius);padding:var(--school-padding)}
+html[data-school-design] :is(.family-card,.teacher-panel,.accounts-card,.parent-bus-card,.driver-trip,.school-feed-card) :is(p,input,textarea,select){font-size:var(--school-text);line-height:1.65}
+html[data-school-design] :is(.family-app,.teacher-app,.accounts-app,.driver-app) :is(h1,h2,h3,h4,button,input,textarea,select){font-family:var(--school-font)}
+html[data-school-design] :is(.family-page-heading h1,.teacher-welcome h1,.accounts-heading h2,.driver-welcome h1){font-weight:700;letter-spacing:-.9px}
+html[data-school-design] :is(.family-primary,.teacher-button,.accounts-primary,.transport-primary){background:var(--school-primary);color:#fff}
+html[data-school-design] :is(.report-spotlight,.report-score-ring>div,.report-document-banner,.driver-vehicle){background:var(--school-primary);border-color:var(--school-primary)}
+html[data-school-design] :is(.report-score-ring){background:conic-gradient(var(--school-secondary) var(--report-progress),#ffffff24 0)}
+html[data-school-design] :is(.teacher-period-marker,.school-feed-avatar,.transport-icon,.report-metric-icon){color:var(--school-primary);background:var(--school-soft)}
+html[data-school-design] :is(.family-bottom-nav,.teacher-floating-nav,.accounts-floating-nav,.driver-floating-nav){border-radius:calc(var(--school-radius) + 2px);background:var(--surface);box-shadow:0 10px 35px #19233417}
+html[data-school-design] :is(.family-bottom-nav,.teacher-floating-nav,.accounts-floating-nav,.driver-floating-nav) button[aria-current=page]{background:var(--school-primary);color:white;border-radius:calc(var(--school-radius) - 4px)}
+html[data-school-design] .family-child-strip.has-siblings .child-chip.selected{background:var(--school-soft);border-color:var(--school-primary)}
+html[data-school-design=expressive] :is(.school-feed-card,.family-record-card,.teacher-class-card,.accounts-invoice){border-radius:var(--school-radius) 10px var(--school-radius) 10px;box-shadow:0 3px 16px #c3443205}
+html[data-school-design=expressive]:not([data-theme=dark]) :is(.family-topbar,.teacher-header,.accounts-header,.driver-header){background:linear-gradient(120deg,#fffaf6,#fff0e8)}
+html[data-school-design=expressive] :is(.family-page-heading h1,.teacher-welcome h1,.driver-welcome h1){font-size:clamp(26px,3vw,34px)}
+html[data-school-design=expressive] .parent-bus-stop{background:#e3effb;color:#192334}
+html[data-school-design=lavender]:not([data-theme=dark]) :is(.family-topbar,.teacher-header,.accounts-header,.driver-header){background:linear-gradient(115deg,#faf5ff,#ecdbff);border-bottom-color:#dac9ed}
+html[data-school-design=lavender] :is(.school-feed-card,.teacher-panel,.accounts-card,.parent-bus-card,.driver-trip){box-shadow:0 5px 22px #7741bc0b}
+html[data-school-design=lavender]:not([data-theme=dark]) :is(.family-section-nav,.parent-segment,.teacher-class-tabs){background:#f6eeff}
+html[data-school-design=blue] :is(.family-topbar,.teacher-header,.accounts-header,.driver-header){background:var(--school-primary);color:white;border-color:var(--school-primary)}
+html[data-school-design=blue] :is(.family-topbar,.teacher-header,.accounts-header,.driver-header) :is(button,a,select,.family-icon,.teacher-icon,.accounts-icon){color:white}
+html[data-school-design=blue] :is(.family-topbar,.teacher-header,.accounts-header,.driver-header) :is(.family-avatar,.driver-avatar){background:white;color:var(--school-primary)}
+html[data-school-design=blue] :is(.family-bottom-nav,.teacher-floating-nav,.accounts-floating-nav,.driver-floating-nav){background:var(--school-primary);border-color:var(--school-primary)}
+html[data-school-design=blue] :is(.family-bottom-nav,.teacher-floating-nav,.accounts-floating-nav,.driver-floating-nav) button{color:white}
+html[data-school-design=blue] :is(.family-bottom-nav,.teacher-floating-nav,.accounts-floating-nav,.driver-floating-nav) button[aria-current=page]{background:#fff;color:var(--school-primary)}
+html[data-school-design=minimal] :is(.school-feed-card,.teacher-panel,.accounts-card,.parent-bus-card,.driver-trip,.family-record-card){box-shadow:none;border-color:var(--line)}
+html[data-school-design=minimal] .school-feed-card{border-width:0 0 1px;border-radius:0}
+html[data-school-design=minimal] :is(.family-bottom-nav,.teacher-floating-nav,.accounts-floating-nav,.driver-floating-nav){box-shadow:0 3px 15px #19233409}
+html[data-school-density=compact] :is(.parent-feed-caption,.parent-learning-note){margin-top:10px;margin-bottom:14px}
+html[data-school-density=compact] :is(.family-home-grid,.teacher-class-grid,.accounts-metrics,.report-subject-grid){gap:14px}
+html[data-school-feed=compact] .school-feed-card .school-feed-body{margin-block:9px;font-size:14px}
+html[data-school-feed=compact] .school-feed-card .post-download-photo img{max-height:180px;object-fit:contain}
+html[data-school-navigation=standard] :is(.family-bottom-nav,.teacher-floating-nav,.accounts-floating-nav,.driver-floating-nav){left:0!important;right:0!important;bottom:0!important;transform:none;width:100%!important;max-width:none;border-radius:0;padding-inline:max(12px,calc((100vw - 800px)/2));box-shadow:0 -3px 15px #1923340a}
+html[data-school-navigation=standard] :is(.family-content,.teacher-main,.accounts-main,.driver-main){padding-bottom:110px}
+@media(max-width:480px){html[data-school-design] :is(.family-card,.teacher-panel,.accounts-card,.parent-bus-card,.driver-trip,.school-feed-card){padding:min(var(--school-padding),20px)}html[data-school-design] :is(.family-content,.teacher-main,.accounts-main,.driver-main){padding-inline:16px}}

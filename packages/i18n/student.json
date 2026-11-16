@@ -1,0 +1,5 @@
+{
+  "en":{"title":"Your learning space","message":"Student sign-in is not enabled. Your school will share access when it is ready.","safety":"No ads. No AI. No trackers.","back":"Back to school sign-in"},
+  "te":{"title":"మీ అభ్యాస స్థలం","message":"విద్యార్థి సైన్ ఇన్ ప్రారంభించబడలేదు. సిద్ధమైనప్పుడు మీ పాఠశాల ప్రవేశ వివరాలు ఇస్తుంది.","safety":"ప్రకటనలు లేవు. AI లేదు. ట్రాకర్లు లేవు.","back":"పాఠశాల సైన్ ఇన్‌కు తిరిగి వెళ్ళండి"},
+  "hi":{"title":"आपका अध्ययन स्थान","message":"छात्र साइन इन चालू नहीं है। तैयार होने पर आपका स्कूल प्रवेश की जानकारी देगा।","safety":"विज्ञापन नहीं। AI नहीं। ट्रैकर नहीं।","back":"स्कूल साइन इन पर लौटें"}
+}

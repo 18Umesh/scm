@@ -1,0 +1,3 @@
+BEGIN;
+ALTER TABLE auth_devices ADD COLUMN host text NOT NULL DEFAULT '';
+COMMIT;

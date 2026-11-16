@@ -1,0 +1,56 @@
+name: Campus checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: campus_test
+        ports: ['5432:5432']
+        options: --health-cmd 'pg_isready -U postgres' --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint && pnpm typecheck && pnpm test
+      - name: Prepare restricted PostgreSQL runtime
+        env:
+          PGPASSWORD: ci-only-password
+        run: |
+          psql -h localhost -U postgres -d campus_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE campus_app NOLOGIN NOSUPERUSER NOBYPASSRLS;
+          CREATE ROLE campus_runtime LOGIN INHERIT NOSUPERUSER NOBYPASSRLS PASSWORD 'ci-runtime-only';
+          GRANT campus_app TO campus_runtime;
+          REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+          CREATE DATABASE campus_operations_test;
+          SQL
+      - name: Run the same isolation tests on PostgreSQL 17
+        run: pnpm test
+        env:
+          TEST_DATABASE_URL: postgresql://campus_runtime:ci-runtime-only@localhost:5432/campus_test
+          TEST_DATABASE_ADMIN_URL: postgresql://postgres:ci-only-password@localhost:5432/campus_test
+          OPERATIONS_TEST_DATABASE_URL: postgresql://campus_runtime:ci-runtime-only@localhost:5432/campus_operations_test
+          OPERATIONS_TEST_DATABASE_ADMIN_URL: postgresql://postgres:ci-only-password@localhost:5432/campus_operations_test
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:browser
+      - name: Check dependency advisories
+        run: pnpm audit --audit-level high
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-evidence
+          path: |
+            test-results/
+            playwright-report/

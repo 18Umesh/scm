@@ -1,0 +1,56 @@
+# Local production-topology check. Supply strong passwords in .env.
+# No public launch or DNS changes are performed by this file.
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: campus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      CAMPUS_DATABASE_PASSWORD: ${CAMPUS_DATABASE_PASSWORD:?Set CAMPUS_DATABASE_PASSWORD in .env}
+    volumes:
+      - campus_pg:/var/lib/postgresql/data
+      - ./infra/postgres-init.sh:/docker-entrypoint-initdb.d/01-campus.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres -d campus']
+      interval: 5s
+      retries: 10
+  migrate:
+    build: .
+    command: [node, dist/scripts/db-setup.js]
+    environment:
+      NODE_ENV: production
+      DATABASE_MODE: postgres
+      DATABASE_URL: postgresql://campus_runtime:${CAMPUS_DATABASE_PASSWORD}@postgres:5432/campus
+      DATABASE_ADMIN_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/campus
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api:
+    build: .
+    environment:
+      NODE_ENV: production
+      DATABASE_MODE: postgres
+      DATABASE_URL: postgresql://campus_runtime:${CAMPUS_DATABASE_PASSWORD}@postgres:5432/campus
+      API_BIND: 0.0.0.0
+      AI_ENABLED: 'false'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  web:
+    build: .
+    command: [node, apps/web/node_modules/next/dist/bin/next, start, apps/web, --hostname, 0.0.0.0]
+    environment:
+      API_URL: http://api:4000
+      STUDENT_URL: http://student:3001
+    ports: ['127.0.0.1:3000:3000']
+    depends_on: [api, student]
+  student:
+    build: .
+    command: [node, apps/student/node_modules/next/dist/bin/next, start, apps/student, --port, '3001', --hostname, 0.0.0.0]
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes: [campus_redis:/data]
+volumes:
+  campus_pg:
+  campus_redis:

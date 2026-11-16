@@ -1,0 +1,68 @@
+'use client';
+import{useEffect,useRef,useState}from'react';
+import AttendanceButtons from './attendance-buttons';
+import{Mic,MicOff,ImagePlus}from'lucide-react';
+import{attendanceStates,attendanceSuggestionErrors,parseAttendanceText,type AttendanceLearner,type AttendanceSuggestion}from'../../../packages/operations/attendance-assist';
+type Mode='voice'|'image'|'manual';
+export default function AttendanceAssistant({learners,initialMode,onApply}:{learners:AttendanceLearner[];initialMode:Mode;onApply:(values:Record<string,string>,source:Mode)=>void}){
+ const[mode,setMode]=useState<Mode>(initialMode),[text,setText]=useState(''),[rows,setRows]=useState<AttendanceSuggestion[]>([]),[error,setError]=useState(''),[message,setMessage]=useState(''),[listening,setListening]=useState(false),[processing,setProcessing]=useState(false),[speechLanguage,setSpeechLanguage]=useState('en-US'),[imageLanguage,setImageLanguage]=useState('eng'),[file,setFile]=useState<File|null>(null),[preview,setPreview]=useState(''),[confidence,setConfidence]=useState<number|null>(null);
+ const recognition=useRef<any>(null),worker=useRef<any>(null),alive=useRef(true),timer=useRef<ReturnType<typeof setTimeout>|null>(null),fileInput=useRef<HTMLInputElement>(null);
+ useEffect(()=>{alive.current=true;return()=>{alive.current=false;recognition.current?.abort();void worker.current?.terminate();if(timer.current)clearTimeout(timer.current);};},[]);
+ useEffect(()=>()=>{if(preview)URL.revokeObjectURL(preview);},[preview]);
+ function changeMode(next:Mode){recognition.current?.abort();setListening(false);setMode(next);setRows([]);setText('');setError('');setMessage('');setConfidence(null);setFile(null);setPreview('');}
+ function stopVoice(){recognition.current?.stop();if(timer.current)clearTimeout(timer.current);}
+ async function startVoice(){
+  setError('');setMessage('');
+  try{
+   const Constructor=(window as any).SpeechRecognition??(window as any).webkitSpeechRecognition;
+   if(!isSecureContext||!Constructor||typeof Constructor.available!=='function')throw new Error('Private voice recognition is unavailable in this browser. Use screenshot import, paste a list, or mark the roster manually.');
+   const instance=new Constructor();if(!('processLocally'in instance))throw new Error('This browser cannot keep voice recognition on this device. Please use screenshot import or manual attendance.');
+   instance.processLocally=true;if(instance.processLocally!==true)throw new Error('On-device speech could not be enabled.');
+   setProcessing(true);const availability=await Constructor.available({langs:[speechLanguage],processLocally:true});
+   if(!alive.current)return;
+   if(availability!=='available'){
+    if(!['downloadable','downloading'].includes(availability)||typeof Constructor.install!=='function')throw new Error('An on-device speech model is unavailable for this language. Choose another language or use screenshot import.');
+    setMessage('Downloading the browser’s on-device language pack. No classroom audio is sent.');
+    if(!await Constructor.install({langs:[speechLanguage]}))throw new Error('The browser could not install the local language pack.');
+   }
+   if(!alive.current)return;
+   instance.lang=speechLanguage;instance.continuous=true;instance.interimResults=false;
+   instance.onresult=(event:any)=>{if(!alive.current)return;const commands:string[]=[];for(let i=event.resultIndex;i<event.results.length;i++)if(event.results[i].isFinal)commands.push(event.results[i][0].transcript);setText(v=>[v,...commands].filter(Boolean).join('\n').slice(0,30000));};
+   instance.onerror=(event:any)=>{if(!alive.current)return;setListening(false);setError(event.error==='not-allowed'?'Microphone permission was denied. You can still import a screenshot or paste the list.':event.error==='no-speech'?'No speech was heard. Try again.':'Local speech recognition stopped. Check the text, then retry if needed.');};
+   instance.onend=()=>{if(timer.current)clearTimeout(timer.current);if(alive.current)setListening(false);};recognition.current=instance;instance.start();setListening(true);setMessage('Listening on this device. Say one student and status at a time, then pause.');timer.current=setTimeout(()=>instance.stop(),60000);
+  }catch(e){if(alive.current)setError(e instanceof Error?e.message:'Voice could not start.');}finally{if(alive.current)setProcessing(false);}
+ }
+ async function analyzeImage(){
+  if(!file)return;setProcessing(true);setError('');setMessage('Reading the screenshot on this device…');setRows([]);
+  let bitmap:ImageBitmap|undefined;
+  try{
+   if(file.size>6*1024*1024)throw new Error('Choose an image smaller than 6 MB.');
+   const bytes=new Uint8Array(await file.slice(0,12).arrayBuffer());const png=bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71,jpg=bytes[0]===255&&bytes[1]===216&&bytes[2]===255,webp=String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP';if(!png&&!jpg&&!webp)throw new Error('Use a PNG, JPEG or WebP screenshot.');
+   bitmap=await createImageBitmap(file);if(bitmap.width*bitmap.height>16_000_000)throw new Error('Choose an image under 16 megapixels.');
+   const canvas=document.createElement('canvas'),scale=Math.min(1,3000/Math.max(bitmap.width,bitmap.height));canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);const context=canvas.getContext('2d');if(!context)throw new Error('Image processing is unavailable.');context.fillStyle='white';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(bitmap,0,0,canvas.width,canvas.height);
+   const{createWorker}=await import('tesseract.js');
+   const engine=await createWorker(imageLanguage,1,{workerPath:'/ocr/worker.min.js',corePath:'/ocr/core',langPath:'/ocr/lang',workerBlobURL:false,cacheMethod:'none',logger:event=>{if(alive.current&&event.status==='recognizing text')setMessage(`Reading screenshot… ${Math.round(event.progress*100)}%`);}});
+   if(!alive.current){await engine.terminate();return;}worker.current=engine;
+   const result=await engine.recognize(canvas);await engine.terminate();worker.current=null;
+   if(!alive.current)return;setText(result.data.text.slice(0,30000));setConfidence(Math.round(result.data.confidence));setRows(parseAttendanceText(result.data.text,learners));setMessage('Screenshot read. Compare every included entry with the image before applying.');
+  }catch(e){if(alive.current)setError(e instanceof Error?e.message:'Could not read this screenshot. Try a clearer image or enter the text manually.');}
+  finally{bitmap?.close();if(worker.current){await worker.current.terminate();worker.current=null;}if(alive.current)setProcessing(false);}
+ }
+ const problems=attendanceSuggestionErrors(rows,learners);
+ const edit=(key:string,patch:Partial<AttendanceSuggestion>)=>setRows(v=>v.map(row=>row.key===key?{...row,...patch}:row));
+ return <div className="attendance-assistant"><div className="teacher-class-tabs" role="tablist" aria-label="Attendance input method">{[['voice','Voice'],['image','Screenshot'],['manual','Paste list']].map(([key,label])=><button key={key} role="tab" aria-selected={mode===key} disabled={processing||listening} onClick={()=>changeMode(key as Mode)}>{label}</button>)}</div>
+  <p>Prepare a draft here. Nothing is saved until you check the roster twice and submit.</p>
+  {error&&<p className="teacher-error" role="alert">{error}</p>}{message&&<p role="status" className="teacher-muted">{message}</p>}
+  {mode==='voice'&&<><label>Spoken language<select aria-label="Spoken language" disabled={listening||processing} value={speechLanguage} onChange={e=>setSpeechLanguage(e.target.value)}><option value="en-US">English</option><option value="hi-IN">Hindi</option><option value="te-IN">Telugu</option></select></label><p className="teacher-muted">For example: “Aarav Reddy absent”, then “Ananya Reddy present”. Audio stays on your device; a supported browser and local language pack are required.</p><button className="teacher-secondary" disabled={processing} onClick={()=>listening?stopVoice():void startVoice()}>{listening?<MicOff size={18}/>:<Mic size={18}/ >}{listening?'Stop listening':'Start voice attendance'}</button></>}
+  {mode==='image'&&<><label>Attendance screenshot<input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" disabled={processing} onChange={e=>{const next=e.target.files?.[0]??null;setFile(next);setPreview(next?URL.createObjectURL(next):'');setRows([]);setText('');setError('');setConfidence(null);}}/></label>{preview&&<img className="attendance-source-image" src={preview} alt="Attendance screenshot for teacher comparison"/>}<label>Text language<select aria-label="Text language" disabled={processing} value={imageLanguage} onChange={e=>setImageLanguage(e.target.value)}><option value="eng">English</option><option value="hin+eng">Hindi and English</option><option value="tel+eng">Telugu and English</option></select></label><p className="teacher-muted">Use a clear, cropped register with names or admission numbers and explicit Present/Absent/P/A marks. Handwriting, ticks and blurry text need manual correction. The image stays in this browser.</p><button className="teacher-secondary" disabled={!file||processing} onClick={()=>void analyzeImage()}><ImagePlus size={18}/>{processing?'Reading screenshot…':'Analyze screenshot'}</button>{confidence!==null&&<p className="teacher-muted">OCR confidence: {confidence}%. {confidence<70?'Low confidence: check the image especially carefully.':'Recognition can still make mistakes.'}</p>}</>}
+  <label>{mode==='voice'?'Recognized attendance text':mode==='image'?'Extracted attendance text':'Attendance list'}<textarea aria-label="Attendance input text" maxLength={30000} rows={6} disabled={processing||listening} value={text} onChange={e=>{setText(e.target.value);setRows([]);}} placeholder={`${learners[0]?.name??'Student name'} absent\n${learners[1]?.name??'Another student'} present`}/></label>
+  <button className="teacher-secondary" disabled={!text.trim()||processing||listening} onClick={()=>{setRows(parseAttendanceText(text,learners));setError('');}}>Match to class roster</button>
+  {rows.length>0&&<><h3>Check the suggested entries</h3><div className="attendance-suggestions">{rows.map(row=><article key={row.key} className={'attendance-suggestion '+(row.excluded?'excluded':'')}><p>{row.line}</p>{row.issue&&<small>{row.issue}</small>}<div className="teacher-form-columns"><label>Student<select aria-label={'Student for entry '+row.key} disabled={row.excluded} value={row.studentId} onChange={e=>edit(row.key,{studentId:e.target.value,issue:''})}><option value="">Choose student</option>{learners.map(s=><option key={s.id} value={s.id}>{s.name} · {s.admissionNumber}</option>)}</select></label><div><span>Status</span><AttendanceButtons name={'entry '+row.key} value={row.status} disabled={row.excluded} onChange={value=>edit(row.key,{status:value,issue:''})}/></div></div><label className="teacher-check"><input type="checkbox" checked={row.excluded} onChange={e=>edit(row.key,{excluded:e.target.checked})}/>Exclude this entry</label></article>)}</div>{problems.length>0&&<ul className="attendance-import-problems">{problems.map(p=><li key={p}>{p}</li>)}</ul>}<p className="teacher-muted">Students omitted from an import stay unmarked unless attendance was previously recorded. You must finish those rows before saving.</p><button className="teacher-button" disabled={problems.length>0||processing||listening} onClick={()=>onApply(Object.fromEntries(rows.filter(r=>!r.excluded).map(r=>[r.studentId,r.status])),mode)}>Apply draft to roster</button></>}
+  {!rows.length&&text.trim()&&<p className="teacher-muted">Use “Match to class roster” to find entries. If nothing matches, use full names and explicit attendance statuses.</p>}
+ </div>;
+}
+
+export function AttendanceConfirmation({learners,values,date,className,source,busy,onSubmit}:{learners:AttendanceLearner[];values:Record<string,string>;date:string;className:string;source:Mode;busy:boolean;onSubmit:()=>void}){
+ const[step,setStep]=useState(1),[checked,setChecked]=useState(false);
+ return <div className="attendance-confirmation"><p className="teacher-status">Check {step} of 2</p><h3>{step===1?'Check each student and attendance status':'Check the class, date and totals again'}</h3><p><strong>{className}</strong> · {date} · {source==='image'?'Screenshot-assisted':source==='voice'?'Voice-assisted':'Manual'} attendance</p><div className="attendance-review-totals">{attendanceStates.map(status=>{const count=learners.filter(r=>values[r.id]===status).length;return count>0?<span key={status}>{count} {status}</span>:null;})}</div><div className="attendance-final-roster">{learners.map(s=><article key={s.id}><div><strong>{s.name}</strong><small>{s.admissionNumber}</small></div><strong>{values[s.id]||'Not marked'}</strong></article>)}</div><label className="teacher-check"><input type="checkbox" checked={checked} disabled={busy} onChange={e=>setChecked(e.target.checked)}/>{step===1?'I checked every student and attendance status.':'I checked the class, date and full roster a second time.'}</label><div className="teacher-form-footer">{step===2&&<button className="teacher-secondary" disabled={busy} onClick={()=>{setStep(1);setChecked(false);}}>Back to first check</button>}<button className="teacher-button" disabled={!checked||busy||learners.some(s=>!attendanceStates.includes(values[s.id] as 'present'|'absent'))} onClick={()=>{if(step===1){setStep(2);setChecked(false);}else onSubmit();}}>{busy?'Submitting…':step===1?'Continue to second check':'Confirm and submit attendance'}</button></div></div>;
+}

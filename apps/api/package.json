@@ -1,0 +1,1 @@
+{"name":"@campus/api","private":true,"version":"0.1.0","scripts":{"build":"tsc -p ../../tsconfig.json","start":"node ../../dist/apps/api/src/main.js"}}

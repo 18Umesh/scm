@@ -1,0 +1,54 @@
+'use client';
+import {useRef,useState,type FormEvent} from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import {ArrowLeft,Check,ChevronDown,Globe2,Search,Send,Users,X,ImagePlus,Paperclip,Link2} from 'lucide-react';
+import './teacher-post-composer.css';
+import PostFilePreview from './post-file-preview';
+import{POST_FILE_LIMIT,POST_TOTAL_BYTES,POST_FILE_ACCEPT}from '../../../packages/ui/post-files';
+type Props={classes:any[];students:any[];values:Record<string,any>;change:(key:string,value:any)=>void;className:(id:string)=>string;author:string;uploadsEnabled:boolean;studentsLoading:boolean;busy:boolean;error:string;save:(event:FormEvent)=>void};
+export default function TeacherPostComposer({classes,students,values,change,className,author,uploadsEnabled,studentsLoading,busy,error,save}:Props){
+ const [picking,setPicking]=useState(false),[mode,setMode]=useState<'classes'|'students'>('classes'),[query,setQuery]=useState('');
+ const photoInput=useRef<HTMLInputElement>(null),fileInput=useRef<HTMLInputElement>(null);
+ const [preparing,setPreparing]=useState(false),[fileError,setFileError]=useState(''),[linkOpen,setLinkOpen]=useState(false),[linkUrl,setLinkUrl]=useState(''),[linkName,setLinkName]=useState('');
+ const files:File[]=values.files??[],links:{name:string;url:string}[]=values.links??[];
+ const [draftClasses,setDraftClasses]=useState<string[]>([]),[draftStudents,setDraftStudents]=useState<string[]>([]);
+ const ids:string[]=values.classIds??[],studentIds:string[]=values.studentIds??[];
+ const summary=studentIds.length?(studentIds.length===1?students.find(s=>s.id===studentIds[0])?.payload.name??'1 student':`${studentIds.length} students`):ids.length===classes.length?'All my classes':ids.length===1?className(ids[0]):`${ids.length} classes`;
+ const toggle=(list:string[],id:string)=>list.includes(id)?list.filter(v=>v!==id):[...list,id];
+ function pick(){setDraftClasses(ids);setDraftStudents(studentIds);setMode(studentIds.length?'students':'classes');setQuery('');setPicking(true);}
+ function done(){change('classIds',mode==='classes'?draftClasses:[...new Set(students.filter(s=>draftStudents.includes(s.id)).map(s=>s.class_id))]);change('studentIds',mode==='students'?draftStudents:[]);setPicking(false);}
+ async function attach(picked:FileList|null){
+  if(!picked)return;setFileError('');setPreparing(true);
+  try{if(files.length+links.length+picked.length>POST_FILE_LIMIT)throw new Error('Add up to 5 photos, files or links per post.');const added:File[]=[];
+   for(const file of Array.from(picked)){if(file.name.length>150)throw new Error('Use a shorter file name (150 characters maximum).');if(file.type.startsWith('image/')){
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>20*1024*1024)throw new Error('Choose a JPG, PNG or WebP photo under 20 MB.');
+    const bitmap=await createImageBitmap(file,{resizeWidth:1600});try{const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext('2d')!.drawImage(bitmap,0,0);const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Could not prepare this photo.')),'image/webp',0.82));added.push(new File([blob],file.name.replace(/\.[^.]+$/,'').slice(0,145)+'.webp',{type:'image/webp'}));}finally{bitmap.close();}
+   }else{if(!/\.(pdf|docx|xlsx|pptx|txt|csv)$/i.test(file.name))throw new Error('Choose a PDF, Word, Excel, PowerPoint, TXT or CSV file.');added.push(file);}}
+   if([...files,...added].reduce((sum,file)=>sum+file.size,0)>POST_TOTAL_BYTES)throw new Error('Keep uploaded files under 6 MB in total, or attach a school file link.');change('files',[...files,...added]);
+  }catch(error){setFileError(error instanceof Error?error.message:'Could not add these files.');}finally{setPreparing(false);if(photoInput.current)photoInput.current.value='';if(fileInput.current)fileInput.current.value='';}
+ }
+ function addLink(){try{if(files.length+links.length>=POST_FILE_LIMIT)throw new Error('Add up to 5 attachments per post.');const url=new URL(linkUrl);if(url.protocol!=='https:'||url.username||url.password||url.href.length>2000)throw new Error('Use a valid HTTPS school file link.');change('links',[...links,{name:linkName.trim()||url.hostname+' file',url:url.href}]);setLinkOpen(false);setLinkUrl('');setLinkName('');setFileError('');}catch(error){setFileError(error instanceof Error?error.message:'Use a valid school file link.');}}
+ const names=(mode==='classes'?classes:students).filter(r=>(mode==='classes'?className(r.id):r.payload.name+' '+className(r.class_id)+' '+r.payload.admissionNumber).toLowerCase().includes(query.toLowerCase()));
+ return <>
+  <header className="post-mobile-header">{picking?<button type="button" className="post-icon" aria-label="Back to post" onClick={()=>setPicking(false)}><ArrowLeft size={21}/></button>:<Dialog.Close className="post-icon" aria-label="Close"><X size={21}/></Dialog.Close>}<Dialog.Title>{picking?'Send to':'New post'}</Dialog.Title>{picking?<button type="button" className="post-publish" disabled={mode==='classes'?!draftClasses.length:!draftStudents.length} onClick={e=>{e.preventDefault();done();}}>Done<Check size={16}/></button>:<button type="submit" form="teacher-new-post" className="post-publish" disabled={busy||preparing||(!values.body?.trim()&&!files.length&&!links.length)||!ids.length}>{busy?'Posting…':'Post'}<Send size={15}/></button>}</header>
+  {picking?<div className="post-recipient-picker">
+   <div className="post-picker-tabs" role="tablist" aria-label="Recipient type">{(['classes','students'] as const).map(key=><button type="button" role="tab" aria-selected={mode===key} key={key} onClick={()=>{setMode(key);setQuery('');}}>{key==='classes'?'Classes':'Students'}</button>)}</div>
+   <label className="post-search"><Search size={18}/><input aria-label="Search recipients" placeholder={mode==='classes'?'Find a class':'Find a student or class'} value={query} onChange={e=>setQuery(e.target.value)}/></label>
+   <div className="post-recipient-list">
+    {mode==='classes'&&!query&&<button type="button" className="post-recipient-row post-all-row" aria-pressed={draftClasses.length===classes.length} onClick={()=>setDraftClasses(draftClasses.length===classes.length?[]:classes.map(c=>c.id))}><span className="post-recipient-avatar"><Globe2 size={20}/></span><span><strong>All my classes</strong><small>Everyone in your {classes.length} classes</small></span><span className="post-selection">{draftClasses.length===classes.length&&<Check size={15}/>}</span></button>}
+    {names.map(r=>{const chosen=(mode==='classes'?draftClasses:draftStudents).includes(r.id);return <button type="button" className="post-recipient-row" key={r.id} aria-pressed={chosen} onClick={()=>mode==='classes'?setDraftClasses(toggle(draftClasses,r.id)):setDraftStudents(toggle(draftStudents,r.id))}><span className={'post-recipient-avatar '+(mode==='students'?'student':'')}>{mode==='classes'?<Users size={19}/>:r.payload.name.slice(0,1)}</span><span><strong>{mode==='classes'?className(r.id):r.payload.name}</strong><small>{mode==='classes'?`${r.student_count} students`:className(r.class_id)+' · '+r.payload.admissionNumber}</small></span><span className="post-selection">{chosen&&<Check size={15}/>}</span></button>;})}
+    {!names.length&&<p className="post-no-results">{studentsLoading?'Loading students…':query?'No matches found.':'No students in your assigned classes yet.'}</p>}
+   </div><div className="post-picker-summary">{mode==='classes'?draftClasses.length:draftStudents.length} {mode==='classes'?'classes':'students'} selected{mode==='students'&&<small>Visible only to the selected students’ linked families.</small>}</div>
+  </div>:<form id="teacher-new-post" className="post-message-form" onSubmit={save}>
+   <div className="post-author"><span className="post-author-avatar">{author.split(' ').map(n=>n[0]).slice(0,2).join('')}</span><div><strong>{author}</strong><button type="button" className="post-to" aria-label={'Choose recipients: '+summary} onClick={pick}><Users size={13}/><span>{summary}</span><ChevronDown size={13}/></button></div></div>
+   {error&&<p className="teacher-error" role="alert">{error}</p>}
+   <div className="post-draft-scroll"><textarea aria-label="Post message" placeholder="What would you like to share?" maxLength={8000} value={values.body??''} onChange={e=>change('body',e.target.value)}/>
+   {(fileError||preparing)&&<p className="post-file-error" role={fileError?'alert':'status'}>{fileError||'Preparing photos...'}</p>}
+   <div className="post-draft-files">{files.map((file,index)=><PostFilePreview key={index+file.name} file={file} disabled={busy} remove={()=>change('files',files.filter((_,i)=>i!==index))}/>)}{links.map((link,index)=><div className="post-file-preview" key={index+link.url}><Link2 size={22}/><span><strong>{link.name}</strong><small>{new URL(link.url).hostname}</small></span><button type="button" disabled={busy} aria-label={'Remove '+link.name} onClick={()=>change('links',links.filter((_,i)=>i!==index))}><X size={16}/></button></div>)}</div>
+   {linkOpen&&<div className="post-school-link" onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addLink();}}}><strong>School file link</strong><p>Paste a school-owned Drive or OneDrive link. Access is managed by that service.</p><label>File name<input maxLength={150} value={linkName} onChange={e=>setLinkName(e.target.value)} placeholder="e.g. Maths worksheet"/></label><label>File link<input type="url" value={linkUrl} onChange={e=>setLinkUrl(e.target.value)} placeholder="https://drive.google.com/..." maxLength={2000}/></label><div><button type="button" onClick={()=>setLinkOpen(false)}>Cancel</button><button type="button" className="post-publish" onClick={addLink}>Attach link</button></div></div>}
+   </div>
+   {!uploadsEnabled&&<p className="post-link-mode">Files stay in your school's storage. Attach a file link below.</p>}
+   <footer className="post-message-footer post-attachment-tools"><div><button type="button" aria-label="Add photos" disabled={busy||preparing||!uploadsEnabled} onClick={()=>photoInput.current?.click()}><ImagePlus size={20}/><span>Photo</span></button><button type="button" aria-label="Add files" disabled={busy||preparing||!uploadsEnabled} onClick={()=>fileInput.current?.click()}><Paperclip size={20}/><span>File</span></button><button type="button" aria-label="Add school file link" disabled={busy} onClick={()=>setLinkOpen(v=>!v)}><Link2 size={20}/><span>Link</span></button></div><span>{(values.body??'').length.toLocaleString()} / 8,000</span><input hidden ref={photoInput} type="file" aria-label="Post photos" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>void attach(e.target.files)}/><input hidden ref={fileInput} type="file" aria-label="Post files" accept={POST_FILE_ACCEPT} multiple onChange={e=>void attach(e.target.files)}/></footer>
+  </form>}
+ </>;
+}

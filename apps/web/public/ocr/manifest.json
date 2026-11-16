@@ -1,0 +1,17 @@
+{
+  "revision": "87416418657359cb625c412a48b6e1d6d41c29bd",
+  "languages": {
+    "eng": {
+      "sha256": "22d975baf864a9d30757dccd47020e08c433ba4b2324d1edbfc645df996a15be",
+      "bytes": 1975928
+    },
+    "hin": {
+      "sha256": "abdc590d1964261361b999fbe75c196eaae423115de20514b495aca026924746",
+      "bytes": 921573
+    },
+    "tel": {
+      "sha256": "b528e5aa987e0e67d3d2f4327a716bd106906fa8004ca974b60293a28482e129",
+      "bytes": 1247949
+    }
+  }
+}
