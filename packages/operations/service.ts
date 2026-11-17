@@ -137,8 +137,9 @@ export class Operations {
     }
     if(communications.has(key)){
       const user=put(ctx.userId)+'::uuid';const role=put(ctx.role);const classIds=put(ctx.role==='parent'||ctx.role==='student'?scope.studentClasses:scope.classes);
-      const kind=ctx.role==='parent'?"audience->>'kind' IN ('parents','both','people')":ctx.role==='student'?"audience->>'kind'='students'":"audience->>'kind' IN ('staff','parents','both','people')";
+      const kind=ctx.role==='parent'?"audience->>'kind' IN ('parents','both','people')":ctx.role==='student'?"audience->>'kind' IN ('students','both','people')":"audience->>'kind' IN ('staff','parents','both','people')";
       const audience=`(${kind} AND (jsonb_array_length(COALESCE(audience->'roles','[]'))=0 OR audience->'roles' ? ${role}::text) AND (jsonb_array_length(COALESCE(audience->'classIds','[]'))=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(audience->'classIds') a(value) WHERE a.value=ANY(${classIds}::text[]))) AND (audience->>'kind'<>'people' OR audience->'userIds' ? ${user}::text))`;
+      if(ctx.role==='student')clauses.push(`(jsonb_array_length(COALESCE(audience->'studentIds','[]'))=0 OR EXISTS(SELECT 1 FROM jsonb_array_elements_text(audience->'studentIds') s(value) WHERE s.value=ANY(${put(scope.children)}::text[])))`);
       clauses.push(ctx.role==='parent'||ctx.role==='student'?audience:`(owner_id=${user} OR ${audience} OR ${role} IN ('principal','admin','management'))`);
       if(!['principal','admin','management'].includes(ctx.role))clauses.push(`(published=true OR owner_id=${user})`);
       clauses.push("(payload->>'publishAt' IS NULL OR (payload->>'publishAt')::timestamptz<=now() OR owner_id="+user+")");
@@ -181,7 +182,7 @@ export class Operations {
     if(ctx.role==='accounts'&&key==='students')r.payload=Object.fromEntries(['name','admissionNumber','classId'].map(k=>[k,r.payload[k]]));
     if(ctx.role==='accounts'&&key==='staff')r.payload=Object.fromEntries(['name','employeeNumber','designation'].map(k=>[k,r.payload[k]]));
     if(key==='exams'&&r.status!=='paperReleased'&&!['principal','hod','teacher','admin'].includes(ctx.role))delete r.payload.questionPaper;
-    if(key==='exams'&&ctx.role==='parent'&&r.payload.questionPaper){
+    if(key==='exams'&&['parent','student'].includes(ctx.role)&&r.payload.questionPaper){
       const end=new Date(`${r.payload.date}T${r.payload.endTime}:00+05:30`);if(Date.now()<end.getTime())delete r.payload.questionPaper;
     }
     return r;
@@ -189,7 +190,7 @@ export class Operations {
   async create(ctx:Actor,key:string,input:unknown){const d=this.definition(key);if(!this.canCreate(ctx,key,d))throw new OperationError(403,'forbidden');const payload=d.schema.parse(input);return this.db.tenant(ctx.schoolId,ctx.userId,tx=>this.insert(tx,ctx,key,payload));}
   async provisionStudent(ctx:Actor,input:unknown){if(!['principal','admin'].includes(ctx.role))throw new OperationError(403,'forbidden');const body=z.object({studentId:z.uuid(),username:z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/),pin:z.string().regex(/^\d{6,10}$/)}).strict().parse(input);return this.db.tenant(ctx.schoolId,ctx.userId,async tx=>{
     const student=(await tx.query("SELECT s.id,c.payload->>'studentLoginEnabled' AS enabled FROM students s JOIN classes c ON c.id=s.class_id WHERE s.id=$1 AND s.deleted_at IS NULL",[body.studentId])).rows[0];if(student?.enabled!=='true')throw new OperationError(409,'studentLoginDisabled');
-    const result=(await tx.query('SELECT provision_student_login($1,$2,$3) AS id',[body.studentId,body.username,hashPassword(body.pin)])).rows[0];return{userId:result.id,username:body.username};
+    const result=(await tx.query('SELECT provision_student_login($1,$2,$3) AS id',[body.studentId,body.username,hashPassword(body.pin)])).rows[0];await this.audit(tx,ctx,'studentLogin.provisioned','students',body.studentId);return{userId:result.id,username:body.username.toLowerCase()};
   });}
   async provisionGuardian(ctx:Actor,input:unknown){
     if(!['principal','admin'].includes(ctx.role))throw new OperationError(403,'forbidden');
@@ -649,12 +650,13 @@ export class Operations {
     }
   }
   private async publishNotifications(tx:Queryable,ctx:Actor,row:RecordRow){
-    const audience=row.audience!;let roles:string[]=audience.kind==='staff'?['teacher','hod','principal','admin','accounts','management']:audience.kind==='parents'?['parent']:audience.kind==='students'?['student']:['teacher','hod','principal','admin','accounts','management','parent'];
+    const audience=row.audience!;let roles:string[]=audience.kind==='staff'?['teacher','hod','principal','admin','accounts','management']:audience.kind==='parents'?['parent']:audience.kind==='students'?['student']:['teacher','hod','principal','admin','accounts','management','parent','student'];
     if(audience.roles.length)roles=roles.filter(r=>audience.roles.includes(r as Role));
     const members=(await tx.query('SELECT DISTINCT user_id FROM memberships WHERE active=true AND role=ANY($1::text[])',[roles])).rows;
     for(const member of members){
       if(audience.kind==='people'&&!audience.userIds.includes(member.user_id))continue;
-      if(audience.classIds.length){const match=(await tx.query("SELECT id FROM guardians WHERE owner_id=$1 AND class_id=ANY($2::uuid[]) AND deleted_at IS NULL AND payload->>'canView'='true' UNION ALL SELECT id FROM memberships WHERE user_id=$1 AND scope->'classes' ?| $3::text[]",[member.user_id,audience.classIds,audience.classIds])).rows;if(!match.length)continue;}
+      if(audience.studentIds?.length){const pupil=(await tx.query("SELECT id FROM students WHERE owner_id=$1 AND deleted_at IS NULL AND status='active'",[member.user_id])).rows[0];if(pupil&&!audience.studentIds.includes(pupil.id))continue;}
+      if(audience.classIds.length){const match=(await tx.query("SELECT id FROM guardians WHERE owner_id=$1 AND class_id=ANY($2::uuid[]) AND deleted_at IS NULL AND payload->>'canView'='true' UNION ALL SELECT id FROM memberships WHERE user_id=$1 AND scope->'classes' ?| $3::text[] UNION ALL SELECT id FROM students WHERE owner_id=$1 AND class_id=ANY($2::uuid[]) AND deleted_at IS NULL AND status='active'",[member.user_id,audience.classIds,audience.classIds])).rows;if(!match.length)continue;}
       await this.notify(tx,ctx,member.user_id,row.payload.postType==='emergency'?'emergency':row.payload.title||'School update',row.payload.body??row.payload.description??'',{recordId:row.id,audience});
     }
   }

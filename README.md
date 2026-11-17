@@ -11,13 +11,15 @@ npx --yes pnpm@10.32.1 install --frozen-lockfile
 npx --yes pnpm@10.32.1 dev
 ```
 
-Open **http://netaji.localhost:3000** or **http://localhost:3000**. Choose a Sample account on the sign-in screen. All sample account passwords are `NetajiDemo!2026`.
+Open **http://netaji.localhost:3000** or **http://localhost:3000**. Choose a Sample account on the sign-in screen. All staff/parent sample passwords are `NetajiDemo!2026`.
 
 [Account list, students, parent links and reporting structure](docs/NETAJI_SETUP.md)
 
-The seeded Netaji Principal and Accounts sample accounts use email and password alone in the non-production embedded demo. Production and other schools retain second-factor requirements.
+The seeded Netaji Principal and Accounts logins use email and password alone in the non-production embedded demo. Other schools and production retain second-factor requirements.
 
-The active database is `.data/netaji-campus`. The previous two-school database is retained inactive at `.data/campus`; its accounts and hosts are not loaded. Reopening the app preserves changes. No student logins or additional parent accounts are created.
+Student sign-in: **http://localhost:3000/student**. Choose one of the ten students, or use username `aarav.reddy` and local demo PIN `240426`. See [Student workspace](docs/STUDENT_WORKSPACE.md).
+
+The active database is `.data/netaji-campus`. The previous two-school database is retained inactive at `.data/campus`; its accounts and hosts are not loaded. Reopening the app preserves changes. Ten student PIN logins are seeded once for Grade 4 A; later office changes to PINs and class access are preserved.
 
 Teachers report to HOD, HOD reports to Principal, and Accounts reports separately to Principal. Each parent can see only their own linked child. Finance has its chart of accounts and Tuition fee head ready, with no invented charges or payments. Detailed role access can be refined one role at a time.
 
@@ -41,6 +43,6 @@ Teacher posts now support photos, downloadable documents and school-owned file l
 
 All active accounts now open School Feed after sign-in or restoring a session. Teachers can select My School Day for timelines, classes and reminders; the feed preview has been removed from that page. Parent and staff views use the same post-card presentation. The native app and student portal also select Feed first, without enabling any disabled student logins.
 
-## Continue in Codex Cloud
+## Codex Cloud
 
-Read [the current project handoff](docs/CODEX_CLOUD_HANDOFF.md) for the latest implemented features, limitations and verification. Create a Codex Cloud environment from this repository using Node.js 24 and pnpm 10.32.1. Install with `pnpm install --frozen-lockfile`, copy `.env.example` to `.env` for the synthetic demo, then run `pnpm dev`. Configure real provider keys separately in cloud environment secrets.
+Read [the current project handoff](docs/CODEX_CLOUD_HANDOFF.md). Use Node.js 24 and pnpm 10.32.1, install with `pnpm install --frozen-lockfile`, copy `.env.example` to `.env` for the synthetic demo and run `pnpm dev`. Add provider keys separately in environment secrets.

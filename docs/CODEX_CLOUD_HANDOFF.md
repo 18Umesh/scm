@@ -16,7 +16,7 @@ Development web runs on port 3000, student portal on 3001 and API on 4000. Healt
 
 ## Sample users
 
-Shared fictional password: `NetajiDemo!2026`. Account definitions live in `packages/demo/netaji.ts`. There are ten students and eleven staff/parent/driver accounts. Anjali (Mathematics), Ravi (English), Farah (EVS), HOD Meera, Principal Kavitha, Accounts Neha, Incharge Sanjay, driver Ramesh and three parents. Priya has two linked children: Aarav and Diya. Seeded additional classes allow teachers to preview multiple class cards.
+Shared fictional password: `NetajiDemo!2026`. Account definitions live in `packages/demo/netaji.ts`. There are ten students, ten student PIN logins and eleven staff/parent/driver accounts. Anjali (Mathematics), Ravi (English), Farah (EVS), HOD Meera, Principal Kavitha, Accounts Neha, Incharge Sanjay, driver Ramesh and three parents. Priya has two linked children: Aarav and Diya. Seeded additional classes allow teachers to preview multiple class cards.
 
 The seeded Netaji Principal and Accounts users sign in with password alone in non-production embedded mode. Other privileged users/schools and production keep second-factor requirements. The server advertises password-only demo emails in bootstrap. The newest browser tests cover these logins, reload and access to App Design.
 
@@ -29,6 +29,8 @@ The seeded Netaji Principal and Accounts users sign in with password alone in no
 - Parent: child switching, Global/My Feed scopes, attendance/school-calendar toggle and coming-up events, dated homework/timetable, redesigned Report Card/Exam Timetable, online-fee checkout integration and local demo payments, top-bar notifications/profile, settings and live bus tracking. Removed parent settings include pickup, gate passes, consents, privacy requests, leave and family contacts. Concerns & Safety are combined and reach the class teacher/incharge.
 - Driver: assigned buses, explicit start/location sharing/end trip, authenticated GPS updates and a clearly labelled local simulated trip. Foreground GPS is subject to browser/device limits. Parent tracking is guardian/student/vehicle scoped and hides stale locations.
 - School Design Studio: Principal → Brand studio → App Design. Four A–D presets (expressive, lavender, blue, minimal), colours, type, text size, radius, density, floating/fixed navigation, feed density, sample mobile/desktop/role previews, private drafts, reviewed publish, version conflict checks and rollback. Current demo retains its existing appearance until someone publishes a design. Published settings style role web apps; native configuration consumes the same schema/tokens and an immutable design snapshot.
+
+Student workspace is now active at `/student`. Read `docs/STUDENT_WORKSPACE.md`. Sample username: `aarav.reddy`; local demo PIN: `240426`. It has School Feed, My Day, attendance/calendar, timetable, dated homework, Library downloads, published Results/Report Card/Exam Timetable, profile and notifications. Principal/admin can provision or reset student PINs; resets revoke sessions. Grade 4 A is enabled once by the local demo seed; subsequent starts preserve office changes.
 
 ## Important limits
 

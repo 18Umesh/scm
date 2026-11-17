@@ -1,3 +1,4 @@
+import {seedNetajiStudents} from './seed-netaji-students';
 import type{Database}from './index';
 import{id,hashPassword,protectIdentitySecret}from'../auth';
 import{NETAJI}from'../demo/netaji';
@@ -13,7 +14,7 @@ import{seedNetajiTransport}from './seed-netaji-transport';
 export async function seedNetaji(db:Database){
  if(!db.embedded||process.env.NODE_ENV==='production')throw new Error('Netaji sample setup is local-only.');
  const schools=(await db.admin.query('SELECT id FROM schools')).rows;
- if(schools.length){if(schools.length===1&&schools[0].id===NETAJI.schoolId){await seedNetajiClasses(db);await seedNetajiExams(db);await seedNetajiFinance(db);await seedNetajiIncharge(db);await seedNetajiParent(db);await seedNetajiTransport(db);return;}throw new Error('This database contains another demo. Use the dedicated .data/netaji-campus directory.');}
+ if(schools.length){if(schools.length===1&&schools[0].id===NETAJI.schoolId){await seedNetajiClasses(db);await seedNetajiExams(db);await seedNetajiFinance(db);await seedNetajiIncharge(db);await seedNetajiParent(db);await seedNetajiTransport(db);await seedNetajiStudents(db);return;}throw new Error('This database contains another demo. Use the dedicated .data/netaji-campus directory.');}
  await db.admin.query('BEGIN');
  try{
   const password=hashPassword(NETAJI.password),principal=NETAJI.accounts.find(a=>a.role==='principal')!,hod=NETAJI.accounts.find(a=>a.role==='hod')!,accounts=NETAJI.accounts.find(a=>a.role==='accounts')!;
@@ -56,5 +57,5 @@ export async function seedNetaji(db:Database){
  await seedNetajiExams(db);
  await seedNetajiFinance(db);
  await seedNetajiIncharge(db);
- await seedNetajiParent(db);await seedNetajiTransport(db);
+ await seedNetajiParent(db);await seedNetajiTransport(db);await seedNetajiStudents(db);
 }

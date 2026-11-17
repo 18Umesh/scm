@@ -107,3 +107,7 @@ Diary entries now have no title field, prefill the teacher's assigned subject fo
 Rich-media expansion: School Feed now includes native sponsored image/video cards between school posts, and teacher My Classes has a directory placement. In the small demo, the first feed post is followed by an image example; use Next example for the playable eight-second video. Larger live feeds use the spacing described in AD_PLACEMENTS.md. Images/video are local same-origin creative assets. Opening a classroom does not retain the directory placement. The school announcement audience filter was corrected so teachers receive published announcements matching their assigned classes.
 
 Driver demo: Ramesh Yadav, driver@netaji.school, shared password NetajiDemo!2026. Priya now has two linked children: Aarav Reddy and Diya Menon. See BUS_TRACKING.md for simultaneous driver/parent testing.
+
+## Student accounts
+
+The ten Grade 4 A pupils now have individual student logins at `/student`. Choose a sample student or use `aarav.reddy` with demo PIN `240426`. See [Student workspace](STUDENT_WORKSPACE.md) for features and office provisioning/PIN resets. Demo seeding preserves later changes.

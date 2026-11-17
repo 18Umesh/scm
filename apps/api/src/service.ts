@@ -98,6 +98,12 @@ export class CampusService {
       if(path==='/payments/webhook'&&req.method==='POST')return res.json(await this.finance.webhook(tenant.schoolId,(req as Request & {rawBody:Buffer}).rawBody,String(req.headers['x-razorpay-signature']??''),String(req.headers['x-razorpay-event-id']??'')));
       const ctx = await this.authenticate(req,tenant,path === '/auth/refresh');
       if (req.method !== 'GET' && digest(String(req.headers['x-csrf-token'] ?? '')) !== ctx.csrfHash) throw new HttpError(403,'csrfFailed');
+      if(ctx.role==='student'){
+        const ownAccount=['/auth/me','/auth/refresh','/auth/logout'].includes(path);
+        const studentWorkspace=/^\/operations\/student\/(overview|feed|notifications)$/.test(path);
+        const publishedRead=req.method==='GET'&&/^\/operations\/(files(?:\/[a-f0-9-]+)?|documents\/reportCard\/[a-f0-9-]+|records\/(feed|calendar|exams|marks|homework|reportCards|timetable|onlineClasses)(?:\/[a-f0-9-]+)?)$/.test(path);
+        if(!ownAccount&&!studentWorkspace&&!publishedRead)throw new HttpError(403,'forbidden');
+      }
       if (endpoint.permission && !allowed(ctx.role,endpoint.permission)) {
         await this.audit(ctx,'permission.denied',path); throw new HttpError(403,'forbidden');
       }
@@ -211,7 +217,7 @@ export class CampusService {
     return this.db.tenant(tenant.schoolId,undefined,async tx => {
       const school = (await tx.query('SELECT id,name,short_name,city,state,verified FROM schools')).rows[0];
       const theme = (await tx.query('SELECT accent,version,config FROM school_branding WHERE published=true ORDER BY version DESC LIMIT 1')).rows[0];
-      return {school,theme,demo:this.db.embedded,passwordOnlyDemoEmails:NETAJI.accounts.filter(a=>this.localPasswordDemo(tenant.schoolId,a.id)).map(a=>a.email),studentEnabled:false};
+      return {school,theme,demo:this.db.embedded,passwordOnlyDemoEmails:NETAJI.accounts.filter(a=>this.localPasswordDemo(tenant.schoolId,a.id)).map(a=>a.email),studentEnabled:(await tx.query("SELECT id FROM classes WHERE deleted_at IS NULL AND payload->>'studentLoginEnabled'='true' LIMIT 1")).rows.length>0};
     });
   }
   private async login(req: Request,res: Response,tenant: Tenant) {
@@ -245,11 +251,11 @@ export class CampusService {
   }
   private async studentLogin(req:Request,res:Response,tenant:Tenant){
     const input=z.object({username:z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/),pin:z.string().regex(/^\d{6,10}$/)}).strict().parse(req.body);
-    if(!this.limiter.take(`student:${tenant.host}:${input.username}`,8))throw new HttpError(429,'rateLimited');
+    if(!this.limiter.take(`student:${tenant.host}:${input.username.toLowerCase()}`,8))throw new HttpError(429,'rateLimited');
     const user=(await this.db.publicQuery('SELECT * FROM users WHERE email=$1',[input.username.toLowerCase()+'@'+tenant.schoolId+'.student.local'])).rows[0];
     if(!verifyPassword(input.pin,user?.password_hash??this.dummyPassword)||!user)throw new HttpError(401,'invalidCredentials');
     const values=await this.db.tenant(tenant.schoolId,user.id,async tx=>{
-      const membership=(await tx.query("SELECT m.id FROM memberships m JOIN students s ON s.owner_id=m.user_id AND s.school_id=m.school_id JOIN classes c ON c.id=s.class_id AND c.school_id=m.school_id WHERE m.user_id=$1 AND m.role='student' AND m.active=true AND s.deleted_at IS NULL AND s.status='active' AND c.payload->>'studentLoginEnabled'='true'",[user.id])).rows[0];if(!membership)throw new HttpError(403,'studentLoginDisabled');
+      const membership=(await tx.query("SELECT m.id FROM memberships m JOIN students s ON s.owner_id=m.user_id AND s.school_id=m.school_id JOIN classes c ON c.id=s.class_id AND c.school_id=m.school_id WHERE m.user_id=$1 AND m.role='student' AND m.active=true AND s.deleted_at IS NULL AND s.status='active' AND c.deleted_at IS NULL AND c.payload->>'studentLoginEnabled'='true'",[user.id])).rows[0];if(!membership)throw new HttpError(403,'studentLoginDisabled');
       return this.createSession(tx,tenant,user.id,membership.id,false);
     });this.cookies(res,values);return res.json({ok:true,csrfToken:values.csrf});
   }
@@ -260,7 +266,7 @@ export class CampusService {
       const session = (await tx.query(`SELECT s.*,m.role,m.active,m.scope AS membership_scope FROM sessions s JOIN memberships m ON m.id=s.membership_id AND m.school_id=s.school_id AND m.user_id=s.user_id WHERE s.token_hash=$1 AND s.host=$2 AND s.revoked_at IS NULL AND ${refresh ? 's.refresh_expires_at' : 's.expires_at'} > now()`,[digest(raw),tenant.host])).rows[0];
       if (!session || !session.active || (this.requiresMfa(tenant.schoolId,session.user_id,session.role) && !session.mfa_verified)) throw new HttpError(401,'signInRequired');
       if(session.role==='auditor'&&(!session.membership_scope.expiresAt||new Date(session.membership_scope.expiresAt).getTime()<=Date.now()))throw new HttpError(403,'forbidden');
-      if(session.role==='student'&&!(await tx.query("SELECT s.id FROM students s JOIN classes c ON c.id=s.class_id WHERE s.owner_id=$1 AND s.deleted_at IS NULL AND s.status='active' AND c.payload->>'studentLoginEnabled'='true'",[session.user_id])).rows.length)throw new HttpError(403,'studentLoginDisabled');
+      if(session.role==='student'&&!(await tx.query("SELECT s.id FROM students s JOIN classes c ON c.id=s.class_id WHERE s.owner_id=$1 AND s.deleted_at IS NULL AND s.status='active' AND c.deleted_at IS NULL AND c.payload->>'studentLoginEnabled'='true'",[session.user_id])).rows.length)throw new HttpError(403,'studentLoginDisabled');
       return {...tenant,userId:session.user_id,membershipId:session.membership_id,role:session.role,sessionId:session.id,csrfHash:session.csrf_hash,mfa:session.mfa_verified};
     });
   }
